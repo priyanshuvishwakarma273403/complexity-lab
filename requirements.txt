@@ -1,0 +1,1 @@
+# Core dependencies (empty for bootstrap)
