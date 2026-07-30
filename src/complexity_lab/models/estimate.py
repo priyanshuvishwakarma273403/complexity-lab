@@ -24,7 +24,7 @@ class ComplexityClass(Enum):
         self._rank = rank
         self._label = label
         self._plain_name = plain_name
-    
+
     @property
     def rank(self) -> int:
         """Ordering key. Higher means faster-growing; ``UNKNOWN`` sorts below everything."""
