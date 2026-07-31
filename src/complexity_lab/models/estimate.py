@@ -53,6 +53,7 @@ class LoopEvidence:
     line: int
     depth: int
     iteration_desc: str
+    parent_id: int | None
 
 
 @dataclass(frozen=True)
@@ -68,4 +69,3 @@ class ComplexityEstimate:
     space_class: ComplexityClass = ComplexityClass.UNKNOWN
     loops: tuple[LoopEvidence, ...] = ()
     r_squared: float | None = None
-    source: str = "static"

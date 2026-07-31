@@ -1,6 +1,7 @@
 """Natural-language Markdown explanations of complexity estimates."""
 
 from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
+from collections import Counter
 
 MIN_TRUSTWORTHY_FIT = 0.9
 """Below this R-squared, the fit is reported as unreliable rather than as a bound."""
@@ -110,8 +111,8 @@ class ComplexityExplainer:
         return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
 
     def _has_siblings(self, loops: list[LoopEvidence]) -> bool:
-        depths = [loop.depth for loop in loops]
-        return len(set(depths)) != len(depths)
+        parent_counts = Counter(loop.parent_id for loop in loops if loop.parent_id is not None)
+        return any(count > 1 for count in parent_counts.values())
 
     def _narrate_fit(self, dynamic: ComplexityEstimate) -> str:
         measured = dynamic.time_class
@@ -119,6 +120,12 @@ class ComplexityExplainer:
             return (
                 f"Our runtime measurements matched the {measured.label} "
                 f"({measured.plain_name}) model."
+            )
+        if dynamic.r_squared < MIN_TRUSTWORTHY_FIT:
+            return (
+                f"Our runtime measurements did not fit the "
+                f"{measured.label} ({measured.plain_name}) model closely "
+                f"(R² = {dynamic.r_squared:.3f})."
             )
         return (
             f"Our runtime curve-fitting tests matched the {measured.label} "
@@ -129,24 +136,42 @@ class ComplexityExplainer:
         return "\n".join(["## Space Complexity", "", self._narrate_space()])
 
     def _narrate_space(self) -> str:
-        measured = self.dynamic.space_class if self.dynamic is not None else ComplexityClass.UNKNOWN
+        # No Dynamic Analysis
+        if self.dynamic is None:
+            declared = self.static.space_class
+            if declared.is_known:
+                return (
+                    f"Static analysis expects {declared.label} ({declared.plain_name}) "
+                    "auxiliary space. Memory was not profiled, so this bound is theoretical only."
+                )
+            return "Space complexity could not be determined from static analysis."
+
+        measured = self.dynamic.space_class
+
         if measured is ComplexityClass.CONSTANT:
             return (
-                "Peak memory allocations remained constant (O(1)) across all profiled sizes, "
-                "indicating no auxiliary storage scaling."
+                "Peak memory allocations remained constant (O(1)) across all profiled "
+                "sizes, indicating no auxiliary storage scaling."
             )
+
         if measured.is_known:
             return (
-                f"Peak memory allocations grew as {measured.label} ({measured.plain_name}) across "
-                "the profiled sizes, indicating auxiliary storage that scales with the input."
+                f"Peak memory allocations grew as {measured.label} "
+                f"({measured.plain_name}) across the profiled sizes, indicating "
+                "auxiliary storage that scales with the input."
             )
+
+        # Dynamic profiling was performed, but no growth class was determined.
         declared = self.static.space_class
+
         if declared.is_known:
             return (
-                f"Static analysis expects {declared.label} ({declared.plain_name}) auxiliary "
-                "space. Memory was not profiled, so this bound is theoretical only."
+                f"Memory was profiled, but no empirical space complexity could be "
+                f"determined. Static analysis expects {declared.label} "
+                f"({declared.plain_name}) auxiliary space."
             )
-        return "Space complexity could not be determined from either analysis."
+
+        return "Memory was profiled, but no empirical space complexity could be determined."
 
     def _render_verdict(self) -> str:
         return "\n".join(["## Verdict", "", self._narrate_verdict()])

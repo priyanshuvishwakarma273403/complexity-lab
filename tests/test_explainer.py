@@ -4,8 +4,8 @@ from complexity_lab.analyzers.explainer import MIN_TRUSTWORTHY_FIT, ComplexityEx
 from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
 
 NESTED_LOOPS = (
-    LoopEvidence(line=8, depth=1, iteration_desc="N times"),
-    LoopEvidence(line=9, depth=2, iteration_desc="N times"),
+    LoopEvidence(line=8, depth=1, iteration_desc="N times", parent_id=None),
+    LoopEvidence(line=9, depth=2, iteration_desc="N times", parent_id=8),
 )
 
 
@@ -18,7 +18,6 @@ def _static(
         time_class=time_class,
         space_class=space_class,
         loops=loops,
-        source="static",
     )
 
 
@@ -31,7 +30,6 @@ def _dynamic(
         time_class=time_class,
         space_class=space_class,
         r_squared=r_squared,
-        source="dynamic",
     )
 
 
@@ -80,7 +78,7 @@ def test_narrate_loops_without_loops() -> None:
 
 
 def test_narrate_loops_with_single_loop() -> None:
-    loops = (LoopEvidence(line=3, depth=1, iteration_desc="N times"),)
+    loops = (LoopEvidence(line=3, depth=1, iteration_desc="N times", parent_id=None),)
     narration = ComplexityExplainer(
         _static(time_class=ComplexityClass.LINEAR, loops=loops)
     )._narrate_loops()
@@ -102,9 +100,9 @@ def test_narrate_loops_with_nested_pair() -> None:
 
 def test_narrate_loops_labels_third_level_by_depth() -> None:
     loops = (
-        LoopEvidence(line=1, depth=1, iteration_desc="N times"),
-        LoopEvidence(line=2, depth=2, iteration_desc="N times"),
-        LoopEvidence(line=3, depth=3, iteration_desc="N times"),
+        LoopEvidence(line=1, depth=1, iteration_desc="N times", parent_id=None),
+        LoopEvidence(line=2, depth=2, iteration_desc="N times", parent_id=1),
+        LoopEvidence(line=3, depth=3, iteration_desc="N times", parent_id=2),
     )
     narration = ComplexityExplainer(
         _static(time_class=ComplexityClass.CUBIC, loops=loops)
@@ -115,8 +113,8 @@ def test_narrate_loops_labels_third_level_by_depth() -> None:
 
 def test_narrate_loops_flags_sibling_loops_as_additive() -> None:
     loops = (
-        LoopEvidence(line=2, depth=1, iteration_desc="N times"),
-        LoopEvidence(line=9, depth=1, iteration_desc="N times"),
+        LoopEvidence(line=2, depth=1, iteration_desc="N times", parent_id=1),
+        LoopEvidence(line=9, depth=1, iteration_desc="N times", parent_id=1),
     )
     narration = ComplexityExplainer(
         _static(time_class=ComplexityClass.LINEAR, loops=loops)
@@ -134,6 +132,19 @@ def test_time_section_reports_curve_fit() -> None:
         "Our runtime curve-fitting tests matched the O(N^2) (quadratic) model with an R^2 of 0.999."
         in section
     )
+
+
+def test_time_section_reports_match_without_r_squared() -> None:
+    section = ComplexityExplainer(
+        _static(),
+        _dynamic(
+            time_class=ComplexityClass.QUADRATIC,
+            r_squared=None,
+        ),
+    )._render_time_section()
+
+    assert "Our runtime measurements matched the O(N^2) (quadratic) model." in section
+    assert "R^2" not in section
 
 
 def test_verdict_on_agreement_confirms_bound() -> None:
@@ -256,4 +267,4 @@ def test_space_section_when_undetermined() -> None:
         _static(space_class=ComplexityClass.UNKNOWN)
     )._render_space_section()
 
-    assert "could not be determined from either analysis" in section
+    assert "Space complexity could not be determined from static analysis." in section
