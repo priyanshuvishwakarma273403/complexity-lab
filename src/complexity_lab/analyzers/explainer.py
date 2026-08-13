@@ -1,12 +1,11 @@
 """Natural-language Markdown explanations of complexity estimates."""
 
-from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
 from collections import Counter
 
-MIN_TRUSTWORTHY_FIT = 0.9
-"""Below this R-squared, the fit is reported as unreliable rather than as a bound."""
+from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
 
-_ORDINALS = ("outer", "inner")
+MIN_TRUSTWORTHY_FIT = 0.9
+"""Below this R², a fit is reported as unreliable rather than as a bound."""
 
 
 class ComplexityExplainer:
@@ -50,14 +49,14 @@ class ComplexityExplainer:
                 "| --- | --- | --- |",
                 f"| Time | {self.static.time_class.label} | {empirical_time} |",
                 f"| Space | {self.static.space_class.label} | {empirical_space} |",
-                f"| Fit (R^2) | n/a | {self._format_fit()} |",
+                f"| Time Fit (R²) | n/a | {self._format_fit()} |",
             ]
         )
 
     def _format_fit(self) -> str:
-        if self.dynamic is None or self.dynamic.r_squared is None:
+        if self.dynamic is None or self.dynamic.time_r_squared is None:
             return "n/a"
-        return f"{self.dynamic.r_squared:.3f}"
+        return f"{self.dynamic.time_r_squared:.3f}"
 
     def _render_time_section(self) -> str:
         lines = ["## Time Complexity", "", self._narrate_loops()]
@@ -74,10 +73,7 @@ class ComplexityExplainer:
             )
 
         has_siblings = self._has_siblings(loops)
-        phrases = [
-            self._describe_loop(loop, index, nested_chain=not has_siblings)
-            for index, loop in enumerate(loops)
-        ]
+        phrases = [self._describe_loop(loop) for loop in loops]
         detected = f"We detected {self._join_phrases(phrases)}."
         implication = (
             f"This structural layout implies {self.static.time_class.label} "
@@ -86,24 +82,14 @@ class ComplexityExplainer:
         parts = [detected, implication]
         if has_siblings:
             parts.append(
-                "Note that loops at the same nesting depth run in sequence, so their costs add "
-                "together rather than multiply."
+                "Note that these loops are at the same nesting depth and run in sequence, "
+                "so their costs add together rather than multiply."
             )
         return " ".join(parts)
 
-    def _describe_loop(self, loop: LoopEvidence, index: int, *, nested_chain: bool) -> str:
-        # "outer"/"inner" only make sense when each loop sits at its own depth; with siblings the
-        # depth is the only honest description.
-        if nested_chain and index < len(_ORDINALS):
-            role = f"an {_ORDINALS[index]} loop"
-            verb = "iterating" if index == 0 else "running"
-        elif loop.depth <= 1:
-            role = "a top-level loop"
-            verb = "running"
-        else:
-            role = f"a loop nested at depth {loop.depth}"
-            verb = "running"
-        return f"{role} at line {loop.line} {verb} {loop.iteration_desc}"
+    def _describe_loop(self, loop: LoopEvidence) -> str:
+        role = "a top-level loop" if loop.depth <= 1 else f"a loop nested at depth {loop.depth}"
+        return f"{role} at line {loop.line} running {loop.iteration_desc}"
 
     def _join_phrases(self, phrases: list[str]) -> str:
         if len(phrases) == 1:
@@ -111,25 +97,25 @@ class ComplexityExplainer:
         return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
 
     def _has_siblings(self, loops: list[LoopEvidence]) -> bool:
-        parent_counts = Counter(loop.parent_id for loop in loops if loop.parent_id is not None)
+        parent_counts = Counter(loop.parent_id for loop in loops)
         return any(count > 1 for count in parent_counts.values())
 
     def _narrate_fit(self, dynamic: ComplexityEstimate) -> str:
         measured = dynamic.time_class
-        if dynamic.r_squared is None:
+        if dynamic.time_r_squared is None:
             return (
-                f"Our runtime measurements matched the {measured.label} "
-                f"({measured.plain_name}) model."
+                f"Runtime measurements were classified as {measured.label} "
+                f"({measured.plain_name}), but no R² fit score was available."
             )
-        if dynamic.r_squared < MIN_TRUSTWORTHY_FIT:
+        if dynamic.time_r_squared < MIN_TRUSTWORTHY_FIT:
             return (
                 f"Our runtime measurements did not fit the "
                 f"{measured.label} ({measured.plain_name}) model closely "
-                f"(R² = {dynamic.r_squared:.3f})."
+                f"(R² = {dynamic.time_r_squared:.3f})."
             )
         return (
             f"Our runtime curve-fitting tests matched the {measured.label} "
-            f"({measured.plain_name}) model with an R^2 of {dynamic.r_squared:.3f}."
+            f"({measured.plain_name}) model with an R² of {dynamic.time_r_squared:.3f}."
         )
 
     def _render_space_section(self) -> str:
@@ -145,6 +131,15 @@ class ComplexityExplainer:
                     "auxiliary space. Memory was not profiled, so this bound is theoretical only."
                 )
             return "Space complexity could not be determined from static analysis."
+
+        space_fit = self.dynamic.space_r_squared
+        if space_fit is not None and space_fit < MIN_TRUSTWORTHY_FIT:
+            return (
+                "Our memory measurements did not fit any growth model closely "
+                f"(R² = {space_fit:.3f}), so the empirical space figure should be treated as "
+                "unreliable rather than as a confirmed bound. Profile over a wider range of "
+                "input sizes, or reduce measurement noise, then re-run."
+            )
 
         measured = self.dynamic.space_class
 
@@ -179,15 +174,21 @@ class ComplexityExplainer:
     def _narrate_verdict(self) -> str:
         static_class = self.static.time_class
         if self.dynamic is None:
+            if not static_class.is_known:
+                return (
+                    "This report is based on static analysis alone, but "
+                    "static analysis could not determine a time complexity class."
+                )
+
             return (
                 f"This report is based on static analysis alone. {static_class.label} is a "
                 "theoretical worst-case bound; run an empirical profile to confirm it."
             )
 
-        fit = self.dynamic.r_squared
+        fit = self.dynamic.time_r_squared
         if fit is not None and fit < MIN_TRUSTWORTHY_FIT:
             return (
-                f"Our measurements did not fit any growth model closely (R^2 of {fit:.3f}), so "
+                f"Our measurements did not fit any growth model closely (R² of {fit:.3f}), so "
                 "the empirical figure should be treated as unreliable rather than as a competing "
                 "bound. This is a measurement problem, not evidence about your code: profile "
                 "over a wider range of input sizes, or reduce timing noise, then re-run."

@@ -53,19 +53,28 @@ class LoopEvidence:
     line: int
     depth: int
     iteration_desc: str
-    parent_id: int | None
+    parent_id: int | None = None
 
 
 @dataclass(frozen=True)
 class ComplexityEstimate:
     """A complexity estimate from one source.
-
-    Static estimates populate :attr:`loops` and leave :attr:`r_squared` as ``None``; dynamic
-    estimates do the inverse. A single type is used for both so that comparison and rendering
-    need no per-source branching.
+    Static estimates populate :attr:`loops` and leave the R² fields as ``None``;
+    dynamic estimates populate the measured complexity classes and may provide
+    time and space R² values.
     """
 
     time_class: ComplexityClass
     space_class: ComplexityClass = ComplexityClass.UNKNOWN
     loops: tuple[LoopEvidence, ...] = ()
-    r_squared: float | None = None
+    time_r_squared: float | None = None
+    space_r_squared: float | None = None
+
+    def __post_init__(self) -> None:
+        # R² can be negative for a poor fit, but it can never exceed 1.
+        for name, value in (
+            ("time_r_squared", self.time_r_squared),
+            ("space_r_squared", self.space_r_squared),
+        ):
+            if value is not None and value > 1.0:
+                raise ValueError(f"{name} must be at most 1.0, got {value}")
