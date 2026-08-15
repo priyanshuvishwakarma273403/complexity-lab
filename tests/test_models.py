@@ -1,5 +1,7 @@
 """Tests for core domain models."""
 
+from typing import Any
+
 import pytest
 
 from complexity_lab.models import ComplexityClass, ComplexityResult, SourceUnit
@@ -70,7 +72,7 @@ class TestComplexityResult:
         assert result.contributing_locations == ()
 
     def test_equality(self) -> None:
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "best_case": ComplexityClass.LINEAR,
             "worst_case": ComplexityClass.QUADRATIC,
             "average_case": ComplexityClass.LINEAR,
