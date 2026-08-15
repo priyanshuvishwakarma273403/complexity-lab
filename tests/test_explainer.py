@@ -144,15 +144,15 @@ def test_narrate_loops_flags_top_level_sequential_loops_as_siblings() -> None:
 
 
 def test_has_siblings_true_for_two_top_level_loops() -> None:
-    loops = (
+    loops = [
         LoopEvidence(line=2, depth=1, iteration_desc="N times", parent_id=None),
         LoopEvidence(line=6, depth=1, iteration_desc="N times", parent_id=None),
-    )
+    ]
     assert ComplexityExplainer(_static())._has_siblings(loops) is True
 
 
 def test_has_siblings_false_for_single_top_level_loop() -> None:
-    loops = (LoopEvidence(line=2, depth=1, iteration_desc="N times", parent_id=None),)
+    loops = [LoopEvidence(line=2, depth=1, iteration_desc="N times", parent_id=None)]
     assert ComplexityExplainer(_static())._has_siblings(loops) is False
 
 
