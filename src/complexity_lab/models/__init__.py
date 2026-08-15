@@ -1,5 +1,5 @@
-"""Models sub-package."""
+"""Domain models for complexity analysis."""
 
-from complexity_lab.models.estimate import ComplexityClass, ComplexityEstimate, LoopEvidence
+from complexity_lab.models.complexity import ComplexityClass, ComplexityResult, SourceUnit
 
-__all__ = ["ComplexityClass", "ComplexityEstimate", "LoopEvidence"]
+__all__ = ["ComplexityClass", "ComplexityResult", "SourceUnit"]

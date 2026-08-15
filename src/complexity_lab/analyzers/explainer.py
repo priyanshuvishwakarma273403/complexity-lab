@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
+from complexity_lab.models.estimate import ComplexityClass, ComplexityEstimate, LoopEvidence
 
 MIN_TRUSTWORTHY_FIT = 0.9
 """Below this R², a fit is reported as unreliable rather than as a bound."""

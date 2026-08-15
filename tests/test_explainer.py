@@ -1,7 +1,7 @@
 """Tests for the Markdown complexity explainer."""
 
 from complexity_lab.analyzers.explainer import MIN_TRUSTWORTHY_FIT, ComplexityExplainer
-from complexity_lab.models import ComplexityClass, ComplexityEstimate, LoopEvidence
+from complexity_lab.models.estimate import ComplexityClass, ComplexityEstimate, LoopEvidence
 
 NESTED_LOOPS = (
     LoopEvidence(line=8, depth=1, iteration_desc="N times", parent_id=None),
